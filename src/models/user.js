@@ -42,6 +42,10 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  nextStar: {
+    type: Number,
+    default: 20,
+  },
   units: {
     type: String,
     enum: ["Imperial", "Metric"],

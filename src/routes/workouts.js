@@ -1,13 +1,13 @@
 const validateObjectId = require("../middleware/validateObjectId");
 const auth = require("../middleware/auth");
 const validateUser = require("../middleware/validateUser");
+const { validateWokout, validateUpdate } = require("../middleware/validate");
 const { Workout } = require("../models/workout");
 const { User } = require("../models/user");
 const { Exercise } = require("../models/exercise");
+const { addStar } = require("./points");
 const express = require("express");
 const router = express.Router();
-const _ = require("lodash");
-const Joi = require("joi");
 
 router.get("/all", [auth, validateUser], async (req, res) => {
   const workouts = await User.findById(req.user._id)
@@ -23,10 +23,7 @@ router.get("/all", [auth, validateUser], async (req, res) => {
 router.get("/:id", [auth, validateUser, validateObjectId], async (req, res) => {
   const workout = await Workout.findById(req.params.id);
 
-  if (!workout)
-    return res.status(404).send("The workout with the given ID was not found");
-
-  if (workout.creator != req.user._id)
+  if (!workout || workout.creator != req.user._id)
     return res
       .status(404)
       .send("The workout found does not belong to the current user");
@@ -43,23 +40,9 @@ router.get("/:id", [auth, validateUser, validateObjectId], async (req, res) => {
 //   "eReps": [[12, 10],[8, 6]]
 // }
 
-const validate = (req) => {
-  const schema = Joi.object({
-    name: Joi.string().min(3).max(20).required(),
-    numExercises: Joi.number().min(1).required(),
-    eNames: Joi.array().items(Joi.string().min(3).max(20).required()),
-    eSets: Joi.array().items(Joi.number().min(1).required()),
-    eWeights: Joi.array().items(
-      Joi.array().items(Joi.number().min(1).required())
-    ),
-    eReps: Joi.array().items(Joi.array().items(Joi.number().min(1).required())),
-  });
-  return schema.validate(req);
-};
-
 router.post("/add", [auth, validateUser], async (req, res) => {
   const { body } = req;
-  const { error } = validate(body);
+  const { error } = validateWokout(body);
   if (error) return res.status(400).send(error.details[0].message);
 
   let exercises = new Array();
@@ -89,40 +72,27 @@ router.post("/add", [auth, validateUser], async (req, res) => {
   }).save();
 
   // update the user
-  const user = await User.findByIdAndUpdate(req.user._id, {
-    $push: { workouts: workout._id },
-    $inc: { numWorkouts: 1 },
-  });
+  let user = await User.findById(req.user._id);
+  const newNumWorkouts = user.numWorkouts + 1;
+  user.workouts.push(workout._id);
+  user.numWorkouts = newNumWorkouts;
+  await user.save();
 
   workout = await Workout.findByIdAndUpdate(
     workout._id,
     { creator: user._id },
     { new: true }
   );
-  res.send(workout);
-});
 
-const validateUpdate = (req) => {
-  const schema = Joi.object({
-    name: Joi.string().min(3).max(20),
-    numExercises: Joi.number().min(0),
-    eNames: Joi.array().items(Joi.string().min(3).max(20)),
-    numExistingExercises: Joi.number().min(0),
-    existingExercises: Joi.array().items(Joi.objectId()),
-    eSets: Joi.array().items(Joi.number().min(1)),
-    eWeights: Joi.array().items(Joi.array().items(Joi.number().min(1))),
-    eReps: Joi.array().items(Joi.array().items(Joi.number().min(1))),
-  });
-  return schema.validate(req);
-};
+  if (newNumWorkouts === user.nextStar) user = await addStar(user._id);
+
+  res.send(user);
+});
 
 const removeWorkout = async (req, res) => {
   const workout = await Workout.findById(req.params.id);
 
-  if (!workout)
-    return res.status(404).send("The workout with the given ID was not found.");
-
-  if (workout.creator != req.user._id)
+  if (!workout || workout.creator != req.user._id)
     return res
       .status(404)
       .send("The workout found does not belong to the current user");
@@ -142,14 +112,16 @@ const removeWorkout = async (req, res) => {
 };
 
 // {
+//   "name":"PPL",
 //   "eNames": ["Curls", "bench", "Pec deck"],
 //   "numExercises": 3,
 //   "numExistingExercises": 2,
 //   "existingExercises": ["5fe2dbcf550aec4b2c5ab438", "5fe2dbcf550aec4b2c5ab439"],
-//   "eSets": [3,2],
-//   "eWeights": [[20, 30, 40],[50, 55]],
-//   "eReps": [[15, 12, 10],[8, 6]]
+//   "eSets": [3,2,1],
+//   "eWeights": [[20, 30, 40],[50, 55],[25]],
+//   "eReps": [[15, 12, 10],[8, 6],[5]]
 // }
+
 router.patch(
   "/update/:id",
   [auth, validateUser, validateObjectId],
@@ -160,12 +132,7 @@ router.patch(
 
     let workout = await Workout.findById(req.params.id);
 
-    if (!workout)
-      return res
-        .status(404)
-        .send("The workout with the given ID was not found");
-
-    if (workout.creator != req.user._id)
+    if (!workout || workout.creator != req.user._id)
       return res
         .status(404)
         .send("The workout found does not belong to the current user");
@@ -173,8 +140,8 @@ router.patch(
     if (req.body.numExercises === 0) return removeWorkout(req, res);
 
     // remove unused exercises
-    const unusedExercises = workout.exercises.filter(
-      (id) => !body.existingExercises.includes(id)
+    const unusedExercises = workout.exercises.filter((id) =>
+      body.existingExercises.includes(id)
     );
     unusedExercises.forEach(async (id) => {
       await Exercise.findByIdAndRemove(id);
