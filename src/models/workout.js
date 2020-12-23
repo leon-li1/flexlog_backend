@@ -10,13 +10,18 @@ const workoutSchema = new mongoose.Schema({
     minlength: 3,
     maxlength: 20,
   },
+  numExercises: {
+    type: Number,
+    min: 1,
+    required: true,
+  },
   exercises: [
     {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Exercise",
       required: true,
       minlength: 1,
-      unique: true,
+      // unique: true,
     },
   ],
   lastShared: {
@@ -34,6 +39,7 @@ const Workout = mongoose.model("Workout", workoutSchema);
 const validateWorkout = (workout) => {
   const schema = Joi.object({
     name: Joi.string().min(3).max(20).required(),
+    numExercises: Joi.number().min(1).required(),
     exercises: Joi.array().items(Joi.objectId().required()),
     lastShared: Joi.date(),
     user: Joi.objectId(),
