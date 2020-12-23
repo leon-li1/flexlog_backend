@@ -1,6 +1,6 @@
 const Joi = require("joi");
 
-module.exports.validateWokout = (req) => {
+module.exports.validateWorkoutAdd = (req) => {
   const schema = Joi.object({
     name: Joi.string().min(3).max(20).required(),
     numExercises: Joi.number().min(1).required(),

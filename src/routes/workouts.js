@@ -1,7 +1,11 @@
 const validateObjectId = require("../middleware/validateObjectId");
 const auth = require("../middleware/auth");
 const validateUser = require("../middleware/validateUser");
-const { validateWokout, validateUpdate } = require("../middleware/validate");
+const validateWorkout = require("../middleware/validateWorkout");
+const {
+  validateWorkoutAdd,
+  validateUpdate,
+} = require("../middleware/validate");
 const { Workout } = require("../models/workout");
 const { User } = require("../models/user");
 const { Exercise } = require("../models/exercise");
@@ -20,31 +24,16 @@ router.get("/all", [auth, validateUser], async (req, res) => {
   res.send(workouts);
 });
 
-router.get("/:id", [auth, validateUser, validateObjectId], async (req, res) => {
-  const workout = await Workout.findById(req.params.id);
+router.get(
+  "/:id",
+  [auth, validateUser, validateObjectId, validateWorkout],
+  async (req, res) => {
+    const workout = await Workout.findById(req.params.id);
+    res.send(workout);
+  }
+);
 
-  if (!workout || workout.creator != req.user._id)
-    return res
-      .status(404)
-      .send("The workout found does not belong to the current user");
-
-  res.send(workout);
-});
-
-// {
-//   "name": "PPL",
-//   "numExercises": 2,
-//   "eNames": ["Curls", "bench"],
-//   "eSets": [2,2],
-//   "eWeights": [[30, 40],[40, 45]],
-//   "eReps": [[12, 10],[8, 6]]
-// }
-
-router.post("/add", [auth, validateUser], async (req, res) => {
-  const { body } = req;
-  const { error } = validateWokout(body);
-  if (error) return res.status(400).send(error.details[0].message);
-
+const createExercises = async (body, isUpdate) => {
   let exercises = new Array();
   let tmpExercise;
 
@@ -57,18 +46,34 @@ router.post("/add", [auth, validateUser], async (req, res) => {
       reps: body.eReps[i],
       scores: new Array(),
     };
+
     for (let set = 0; set < tmpExercise.sets; set++)
       tmpExercise.scores.push(tmpExercise.weights[set] * tmpExercise.reps[set]);
     tmpExercise.pr = Math.max.apply(null, tmpExercise.scores); //TODO: find max in the loop
-    tmpExercise = await new Exercise(tmpExercise).save();
+
+    if (isUpdate && i < body.numExistingExercises) {
+      tmpExercise = await Exercise.findByIdAndUpdate(
+        body.existingExercises[i],
+        tmpExercise
+      );
+    } else {
+      tmpExercise = await new Exercise(tmpExercise).save();
+    }
     exercises.push(tmpExercise);
-  } //extract this to helper func
+  }
+  return exercises;
+};
+
+router.post("/add", [auth, validateUser], async (req, res) => {
+  const { body } = req;
+  const { error } = validateWorkoutAdd(body);
+  if (error) return res.status(400).send(error.details[0].message);
 
   // create workout
   let workout = await new Workout({
     name: body.name,
     numExercises: body.numExercises,
-    exercises: exercises,
+    exercises: createExercises(body, false),
   }).save();
 
   // update the user
@@ -92,11 +97,6 @@ router.post("/add", [auth, validateUser], async (req, res) => {
 const removeWorkout = async (req, res) => {
   const workout = await Workout.findById(req.params.id);
 
-  if (!workout || workout.creator != req.user._id)
-    return res
-      .status(404)
-      .send("The workout found does not belong to the current user");
-
   workout.exercises.forEach(async (exerciseId) => {
     await Exercise.findByIdAndRemove(exerciseId);
   });
@@ -111,31 +111,13 @@ const removeWorkout = async (req, res) => {
   res.send(deletedworkout);
 };
 
-// {
-//   "name":"PPL",
-//   "eNames": ["Curls", "bench", "Pec deck"],
-//   "numExercises": 3,
-//   "numExistingExercises": 2,
-//   "existingExercises": ["5fe2dbcf550aec4b2c5ab438", "5fe2dbcf550aec4b2c5ab439"],
-//   "eSets": [3,2,1],
-//   "eWeights": [[20, 30, 40],[50, 55],[25]],
-//   "eReps": [[15, 12, 10],[8, 6],[5]]
-// }
-
 router.patch(
   "/update/:id",
-  [auth, validateUser, validateObjectId],
+  [auth, validateUser, validateObjectId, validateWorkout],
   async (req, res) => {
     const { body } = req;
     const { error } = validateUpdate(req.body);
     if (error) return res.status(400).send(error.details[0].message);
-
-    let workout = await Workout.findById(req.params.id);
-
-    if (!workout || workout.creator != req.user._id)
-      return res
-        .status(404)
-        .send("The workout found does not belong to the current user");
 
     if (req.body.numExercises === 0) return removeWorkout(req, res);
 
@@ -146,42 +128,17 @@ router.patch(
     unusedExercises.forEach(async (id) => {
       await Exercise.findByIdAndRemove(id);
     });
-
-    let exercises = new Array();
-    let tmpExercise;
-
-    for (let i = 0; i < body.numExercises; i++) {
-      tmpExercise = {
-        sets: body.eSets[i],
-        weights: body.eWeights[i],
-        reps: body.eReps[i],
-        scores: new Array(),
-      };
-      for (let set = 0; set < tmpExercise.sets; set++)
-        tmpExercise.scores.push(
-          tmpExercise.weights[set] * tmpExercise.reps[set]
-        );
-      tmpExercise.pr = Math.max.apply(null, tmpExercise.scores); //TODO: find max in the loop
-      // check if exercise exists
-      if (i < body.numExistingExercises) {
-        tmpExercise = await Exercise.findByIdAndUpdate(
-          body.existingExercises[i],
-          tmpExercise
-        );
-      } else {
-        tmpExercise.name = body.eNames[i];
-        tmpExercise = await new Exercise(tmpExercise).save();
-      }
-      exercises.push(tmpExercise);
-    } //extract this to helper func
+    await Workout.findByIdAndUpdate(req.params.id, {
+      $pull: { exercises: { $in: unusedExercises } },
+    });
 
     // create workout
-    workout = await Workout.findByIdAndUpdate(
+    const workout = await Workout.findByIdAndUpdate(
       req.params.id,
       {
         name: body.name,
         numExercises: body.numExercises,
-        exercises: exercises,
+        exercises: createExercises(body, true),
       },
       { new: true }
     );
@@ -192,7 +149,7 @@ router.patch(
 
 router.delete(
   "/delete/:id",
-  [auth, validateUser, validateObjectId],
+  [auth, validateUser, validateObjectId, validateWorkout],
   removeWorkout
 );
 
