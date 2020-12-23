@@ -26,12 +26,18 @@ const userSchema = new mongoose.Schema({
   isAdmin: { type: Boolean, default: false },
   points: {
     type: Number,
-    default: 0,
+    default: 50,
   },
-  workouts: {
+  numWorkouts: {
     type: Number,
     default: 0,
   },
+  workouts: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Workout",
+    },
+  ],
   stars: {
     type: Number,
     default: 0,
@@ -71,5 +77,16 @@ const validateUser = (user) => {
   return schema.validate(user);
 };
 
+const validateUserUpdate = (user) => {
+  const schema = Joi.object({
+    name: Joi.string().min(1).max(50),
+    email: Joi.string().min(5).max(255).email(),
+    password: Joi.string().min(4).max(255),
+    passwordConfirm: Joi.ref("password"),
+  });
+  return schema.validate(user);
+};
+
 exports.User = User;
 exports.validate = validateUser;
+exports.validateUserUpdate = validateUserUpdate;

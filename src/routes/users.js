@@ -1,5 +1,5 @@
 const auth = require("../middleware/auth");
-const { User, validate } = require("../models/user");
+const { User, validate, validateUserUpdate } = require("../models/user");
 const express = require("express");
 const router = express.Router();
 const _ = require("lodash");
@@ -7,7 +7,7 @@ const bcrypt = require("bcrypt");
 
 router.get("/all", async (req, res) => {
   const users = await User.find();
-  res.json(users);
+  res.send(users);
 });
 
 router.get("/me", auth, async (req, res) => {
@@ -35,12 +35,14 @@ router.post("/add", async (req, res) => {
 });
 
 router.patch("/update", auth, async (req, res) => {
-  const { error } = validate(req.body);
+  const { error } = validateUserUpdate(req.body);
   if (error) return res.status(400).send(error.details[0].message);
 
   let user = _.pick(req.body, ["name", "email", "password"]);
-  const salt = await bcrypt.genSalt(10);
-  user.password = await bcrypt.hash(user.password, salt);
+  if (req.body.password) {
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(user.password, salt);
+  }
   const updatedUser = await User.findByIdAndUpdate(req.user._id, user, {
     new: true,
   });
