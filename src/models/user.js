@@ -1,14 +1,13 @@
 const Joi = require("joi");
 const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
-const moment = require("moment");
 
 const userSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
     minlength: 1,
-    maxlength: 50,
+    maxlength: 15,
   },
   email: {
     type: String,
@@ -53,7 +52,7 @@ const userSchema = new mongoose.Schema({
   },
   lastLogin: {
     type: Date,
-    default: moment().add(-1, "days").toDate(),
+    default: Date.now,
   },
 });
 
@@ -68,22 +67,17 @@ const User = mongoose.model("User", userSchema);
 
 const validateUser = (user) => {
   const schema = Joi.object({
-    name: Joi.string().min(1).max(50).required(),
+    name: Joi.string().min(1).max(15).required(),
     email: Joi.string().min(5).max(255).required().email(),
     password: Joi.string().min(4).max(255).required(),
-    isAdmin: Joi.boolean(),
-    points: Joi.number().min(0),
-    workouts: Joi.number().min(0),
-    stars: Joi.number().min(0),
-    units: Joi.string(),
-    lastLogin: Joi.date(),
+    passwordConfirm: Joi.ref("password"),
   });
   return schema.validate(user);
 };
 
 const validateUserUpdate = (user) => {
   const schema = Joi.object({
-    name: Joi.string().min(1).max(50),
+    name: Joi.string().min(1).max(15),
     email: Joi.string().min(5).max(255).email(),
     password: Joi.string().min(4).max(255),
     passwordConfirm: Joi.ref("password"),

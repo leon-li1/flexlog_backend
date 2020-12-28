@@ -12,21 +12,22 @@ const { Exercise } = require("../models/exercise");
 const { addStar } = require("./points");
 const express = require("express");
 const router = express.Router();
+const cookieParser = require("cookie-parser")();
 
-router.get("/all", [auth, validateUser], async (req, res) => {
-  const workouts = await User.findById(req.user._id)
+router.get("/all", [cookieParser, auth, validateUser], async (req, res) => {
+  const user = await User.findById(req.user._id)
     .populate({
       path: "workouts",
       populate: { path: "exercises" },
-      select: "-_id",
+      select: "-pr -sets -__v",
     })
-    .select("workouts -_id");
-  res.send(workouts);
+    .select("-creator -numExercises");
+  res.send(user.workouts);
 });
 
 router.get(
   "/:id",
-  [auth, validateUser, validateObjectId, validateWorkout],
+  [cookieParser, auth, validateUser, validateObjectId, validateWorkout],
   async (req, res) => {
     const workout = await Workout.findById(req.params.id);
     res.send(workout);
@@ -64,7 +65,7 @@ const createExercises = async (body, isUpdate) => {
   return exercises;
 };
 
-router.post("/add", [auth, validateUser], async (req, res) => {
+router.post("/add", [cookieParser, auth, validateUser], async (req, res) => {
   const { body } = req;
   const { error } = validateWorkoutAdd(body);
   if (error) return res.status(400).send(error.details[0].message);
@@ -113,7 +114,7 @@ const removeWorkout = async (req, res) => {
 
 router.patch(
   "/update/:id",
-  [auth, validateUser, validateObjectId, validateWorkout],
+  [cookieParser, auth, validateUser, validateObjectId, validateWorkout],
   async (req, res) => {
     const { body } = req;
     const { error } = validateUpdate(req.body);
@@ -149,7 +150,7 @@ router.patch(
 
 router.delete(
   "/delete/:id",
-  [auth, validateUser, validateObjectId, validateWorkout],
+  [cookieParser, auth, validateUser, validateObjectId, validateWorkout],
   removeWorkout
 );
 
