@@ -60,7 +60,7 @@ const createExercises = async (body, isUpdate) => {
     } else {
       tmpExercise = await new Exercise(tmpExercise).save();
     }
-    exercises.push(tmpExercise);
+    exercises.push(tmpExercise._id);
   }
   return exercises;
 };
@@ -71,10 +71,11 @@ router.post("/add", [cookieParser, auth, validateUser], async (req, res) => {
   if (error) return res.status(400).send(error.details[0].message);
 
   // create workout
+  const exerciseIds = await createExercises(body, false);
   let workout = await new Workout({
     name: body.name,
     numExercises: body.numExercises,
-    exercises: createExercises(body, false),
+    exercises: exerciseIds,
   }).save();
 
   // update the user
@@ -112,6 +113,33 @@ const removeWorkout = async (req, res) => {
   res.send(deletedworkout);
 };
 
+router.post(
+  "/duplicate/:id",
+  [cookieParser, auth, validateUser, validateObjectId, validateWorkout],
+  async (req, res) => {
+    let workout = await Workout.findById(req.params.id).select("-_id -__v");
+
+    let arr = new Array();
+    let exercise;
+
+    // duplicate the exercises
+    for (const id_ of workout.exercises) {
+      exercise = await Exercise.findById(id_).select("-_id -__v");
+      exercise = JSON.parse(JSON.stringify(exercise));
+      exercise = await new Exercise(exercise).save();
+      console.log(exercise);
+      console.log(exercise._id);
+      arr.push(exercise._id);
+      console.log(arr);
+    }
+
+    workout.exercises = arr;
+    workout = JSON.parse(JSON.stringify(workout));
+    const newWorkout = await new Workout(workout).save();
+    res.send(newWorkout);
+  }
+);
+
 router.patch(
   "/update/:id",
   [cookieParser, auth, validateUser, validateObjectId, validateWorkout],
@@ -134,12 +162,13 @@ router.patch(
     });
 
     // create workout
+    const exerciseIds = await createExercises(body, true);
     const workout = await Workout.findByIdAndUpdate(
       req.params.id,
       {
         name: body.name,
         numExercises: body.numExercises,
-        exercises: createExercises(body, true),
+        exercises: exerciseIds,
       },
       { new: true }
     );
