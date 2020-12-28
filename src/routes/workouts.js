@@ -83,6 +83,7 @@ router.post("/add", [cookieParser, auth, validateUser], async (req, res) => {
   const newNumWorkouts = user.numWorkouts + 1;
   user.workouts.push(workout._id);
   user.numWorkouts = newNumWorkouts;
+  user.points += 5;
   await user.save();
 
   workout = await Workout.findByIdAndUpdate(
@@ -133,13 +134,13 @@ router.post(
     workout.exercises = exerciseIds;
     workout = JSON.parse(JSON.stringify(workout));
     const newWorkout = await new Workout(workout).save();
-    console.log(newWorkout);
 
     // update the user
     let user = await User.findById(req.user._id);
     const newNumWorkouts = user.numWorkouts + 1;
     user.workouts.push(newWorkout._id);
     user.numWorkouts = newNumWorkouts;
+    user.points += 5;
     await user.save();
 
     if (newNumWorkouts === user.nextStar) user = await addStar(user._id);
