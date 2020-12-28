@@ -4,6 +4,7 @@ const { User } = require("../models/user");
 const express = require("express");
 const router = express.Router();
 const Joi = require("joi");
+const cookieParser = require("cookie-parser")();
 
 const validate = (req) => {
   const schema = Joi.object({
@@ -23,7 +24,7 @@ const addStar = (id) => {
   );
 };
 
-router.patch("/add", [auth, validateUser], async (req, res) => {
+router.patch("/add", [cookieParser, auth, validateUser], async (req, res) => {
   const { error } = validate(req.body);
   if (error) return res.status(400).send(error.details[0].message);
 
@@ -35,10 +36,14 @@ router.patch("/add", [auth, validateUser], async (req, res) => {
   res.send(user);
 });
 
-router.patch("/addStar", [auth, validateUser], async (req, res) => {
-  const user = await addStar(req.user._id);
-  res.send(user);
-});
+router.patch(
+  "/addStar",
+  [cookieParser, auth, validateUser],
+  async (req, res) => {
+    const user = await addStar(req.user._id);
+    res.send(user);
+  }
+);
 
 module.exports = router;
 module.exports.addStar = addStar;
