@@ -119,23 +119,30 @@ router.post(
   async (req, res) => {
     let workout = await Workout.findById(req.params.id).select("-_id -__v");
 
-    let arr = new Array();
+    let exerciseIds = new Array();
     let exercise;
 
-    // duplicate the exercises
+    // duplicate the exercises (I use for of because I depend on the val of exerciseIds after the loop)
     for (const id_ of workout.exercises) {
       exercise = await Exercise.findById(id_).select("-_id -__v");
       exercise = JSON.parse(JSON.stringify(exercise));
       exercise = await new Exercise(exercise).save();
-      console.log(exercise);
-      console.log(exercise._id);
-      arr.push(exercise._id);
-      console.log(arr);
+      exerciseIds.push(exercise._id);
     }
 
-    workout.exercises = arr;
+    workout.exercises = exerciseIds;
     workout = JSON.parse(JSON.stringify(workout));
     const newWorkout = await new Workout(workout).save();
+    console.log(newWorkout);
+
+    // update the user
+    let user = await User.findById(req.user._id);
+    const newNumWorkouts = user.numWorkouts + 1;
+    user.workouts.push(newWorkout._id);
+    user.numWorkouts = newNumWorkouts;
+    await user.save();
+
+    if (newNumWorkouts === user.nextStar) user = await addStar(user._id);
     res.send(newWorkout);
   }
 );
