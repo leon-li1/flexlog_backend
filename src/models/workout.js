@@ -1,7 +1,6 @@
 const Joi = require("joi");
 const mongoose = require("mongoose");
 const moment = require("moment");
-Joi.objectId = require("joi-objectid")(Joi);
 
 const workoutSchema = new mongoose.Schema({
   name: {

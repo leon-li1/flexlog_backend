@@ -8,6 +8,7 @@ require("./startup/config")();
 require("./startup/prod")(app);
 require("./startup/routes")(app);
 require("./startup/db")();
+require("./startup/validation")();
 
 const port = process.env.PORT;
 module.exports = app.listen(port, () =>

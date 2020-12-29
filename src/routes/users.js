@@ -1,10 +1,10 @@
-const auth = require("../middleware/auth");
 const { User, validate, validateUserUpdate } = require("../models/user");
 const express = require("express");
 const router = express.Router();
 const _ = require("lodash");
 const bcrypt = require("bcrypt");
 const cookieParser = require("cookie-parser")();
+const auth = require("../middleware/auth");
 const validateUser = require("../middleware/validateUser");
 
 router.get("/all", async (req, res) => {
@@ -30,10 +30,7 @@ router.post("/add", async (req, res) => {
   user.password = await bcrypt.hash(user.password, salt);
   user.save();
 
-  const token = user.generateAuthToken();
-  res
-    .header("x-auth-token", token)
-    .send(_.pick(user, ["name", "email", "id", "isAdmin"]));
+  res.send(_.pick(user, ["name", "email", "id", "isAdmin"]));
 });
 
 router.patch(

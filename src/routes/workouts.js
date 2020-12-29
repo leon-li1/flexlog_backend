@@ -1,18 +1,18 @@
-const validateObjectId = require("../middleware/validateObjectId");
+const express = require("express");
+const router = express.Router();
+const { Workout } = require("../models/workout");
+const { User } = require("../models/user");
+const { Exercise } = require("../models/exercise");
+const { addStar } = require("./points");
+const cookieParser = require("cookie-parser")();
 const auth = require("../middleware/auth");
 const validateUser = require("../middleware/validateUser");
+const validateObjectId = require("../middleware/validateObjectId");
 const validateWorkout = require("../middleware/validateWorkout");
 const {
   validateWorkoutAdd,
   validateUpdate,
 } = require("../middleware/validate");
-const { Workout } = require("../models/workout");
-const { User } = require("../models/user");
-const { Exercise } = require("../models/exercise");
-const { addStar } = require("./points");
-const express = require("express");
-const router = express.Router();
-const cookieParser = require("cookie-parser")();
 
 const getWorkouts = async (req, res) => {
   const user = await User.findById(req.user._id)
