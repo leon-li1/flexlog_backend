@@ -25,16 +25,30 @@ const getWorkouts = async (req, res) => {
   res.send(user.workouts);
 };
 
-router.get("/all", [cookieParser, auth, validateUser], getWorkouts);
+const updateUser = async (userId, workoutId) => {
+  const user = await User.findById(userId);
+  const newNumWorkouts = user.numWorkouts + 1;
+  user.workouts.push(workoutId);
+  user.numWorkouts = newNumWorkouts;
+  user.points += 5;
+  await user.save();
+  if (newNumWorkouts === user.nextStar) await addStar(userId);
+};
 
-router.get(
-  "/:id",
-  [cookieParser, auth, validateUser, validateObjectId, validateWorkout],
-  async (req, res) => {
-    const workout = await Workout.findById(req.params.id);
-    res.send(workout);
-  }
-);
+const removeWorkout = async (req, res) => {
+  const workout = await Workout.findById(req.params.id);
+
+  workout.exercises.forEach(async (exerciseId) => {
+    await Exercise.findByIdAndRemove(exerciseId);
+  });
+  await Workout.findByIdAndRemove(req.params.id);
+  await User.findByIdAndUpdate(workout.creator, {
+    $pull: { workouts: workout._id },
+    $inc: { numWorkouts: -1 },
+  });
+
+  return getWorkouts(req, res);
+};
 
 const createExercises = async (body, isUpdate) => {
   let exercises = new Array();
@@ -67,6 +81,18 @@ const createExercises = async (body, isUpdate) => {
   return exercises;
 };
 
+// Routes:
+router.get("/all", [cookieParser, auth, validateUser], getWorkouts);
+
+router.get(
+  "/:id",
+  [cookieParser, auth, validateUser, validateObjectId, validateWorkout],
+  async (req, res) => {
+    const workout = await Workout.findById(req.params.id);
+    res.send(workout);
+  }
+);
+
 router.post("/add", [cookieParser, auth, validateUser], async (req, res) => {
   const { body } = req;
   const { error } = validateWorkoutAdd(body);
@@ -81,41 +107,16 @@ router.post("/add", [cookieParser, auth, validateUser], async (req, res) => {
   }).save();
 
   // update the user
-  let user = await User.findById(req.user._id);
-  const newNumWorkouts = user.numWorkouts + 1;
-  user.workouts.push(workout._id);
-  user.numWorkouts = newNumWorkouts;
-  user.points += 5;
-  await user.save();
+  updateUser(req.user._id, workout._id);
 
   workout = await Workout.findByIdAndUpdate(
     workout._id,
-    { creator: user._id },
+    { creator: req.user._id },
     { new: true }
   );
 
-  if (newNumWorkouts === user.nextStar) user = await addStar(user._id);
-
-  res.send(user);
+  res.send(workout);
 });
-
-const removeWorkout = async (req, res) => {
-  const workout = await Workout.findById(req.params.id);
-
-  workout.exercises.forEach(async (exerciseId) => {
-    await Exercise.findByIdAndRemove(exerciseId);
-  });
-
-  const deletedworkout = await Workout.findByIdAndRemove(req.params.id);
-
-  await User.findByIdAndUpdate(deletedworkout.creator, {
-    $pull: { workouts: deletedworkout._id },
-    $inc: { numWorkouts: -1 },
-  });
-
-  // res.send(deletedworkout);
-  return getWorkouts();
-};
 
 router.post(
   "/duplicate/:id",
@@ -134,19 +135,14 @@ router.post(
       exerciseIds.push(exercise._id);
     }
 
+    // Create the workout
     workout.exercises = exerciseIds;
     workout = JSON.parse(JSON.stringify(workout));
     const newWorkout = await new Workout(workout).save();
 
     // update the user
-    let user = await User.findById(req.user._id);
-    const newNumWorkouts = user.numWorkouts + 1;
-    user.workouts.push(newWorkout._id);
-    user.numWorkouts = newNumWorkouts;
-    user.points += 5;
-    await user.save(); //TODO:: helper func
+    updateUser(req.user._id, newWorkout._id);
 
-    if (newNumWorkouts === user.nextStar) user = await addStar(user._id);
     res.send(newWorkout);
   }
 );
