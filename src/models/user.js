@@ -81,6 +81,7 @@ const validateUserUpdate = (user) => {
     email: Joi.string().min(5).max(255).email(),
     password: Joi.string().min(4).max(255),
     passwordConfirm: Joi.ref("password"),
+    units: Joi.valid("Metric", "Imperial"),
   });
   return schema.validate(user);
 };

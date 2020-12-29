@@ -14,7 +14,7 @@ const express = require("express");
 const router = express.Router();
 const cookieParser = require("cookie-parser")();
 
-router.get("/all", [cookieParser, auth, validateUser], async (req, res) => {
+const getWorkouts = async (req, res) => {
   const user = await User.findById(req.user._id)
     .populate({
       path: "workouts",
@@ -23,7 +23,9 @@ router.get("/all", [cookieParser, auth, validateUser], async (req, res) => {
     })
     .select("-creator -numExercises");
   res.send(user.workouts);
-});
+};
+
+router.get("/all", [cookieParser, auth, validateUser], getWorkouts);
 
 router.get(
   "/:id",
@@ -111,7 +113,8 @@ const removeWorkout = async (req, res) => {
     $inc: { numWorkouts: -1 },
   });
 
-  res.send(deletedworkout);
+  // res.send(deletedworkout);
+  return getWorkouts();
 };
 
 router.post(
@@ -141,7 +144,7 @@ router.post(
     user.workouts.push(newWorkout._id);
     user.numWorkouts = newNumWorkouts;
     user.points += 5;
-    await user.save();
+    await user.save(); //TODO:: helper func
 
     if (newNumWorkouts === user.nextStar) user = await addStar(user._id);
     res.send(newWorkout);

@@ -5,6 +5,7 @@ const router = express.Router();
 const _ = require("lodash");
 const bcrypt = require("bcrypt");
 const cookieParser = require("cookie-parser")();
+const validateUser = require("../middleware/validateUser");
 
 router.get("/all", async (req, res) => {
   const users = await User.find();
@@ -35,23 +36,26 @@ router.post("/add", async (req, res) => {
     .send(_.pick(user, ["name", "email", "id", "isAdmin"]));
 });
 
-router.patch("/update", [cookieParser, auth], async (req, res) => {
-  const { error } = validateUserUpdate(req.body);
-  if (error) return res.status(400).send(error.details[0].message);
+router.patch(
+  "/update",
+  [cookieParser, auth, validateUser],
+  async (req, res) => {
+    const { error } = validateUserUpdate(req.body);
+    if (error) return res.status(400).send(error.details[0].message);
 
-  let user = _.pick(req.body, ["name", "email", "password"]);
-  if (req.body.password) {
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(user.password, salt);
+    let user = _.pick(req.body, ["name", "email", "password", "units"]);
+    if (req.body.password && user.password !== "TEST") {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(user.password, salt);
+    } else {
+      delete user.password;
+    }
+    const updatedUser = await User.findByIdAndUpdate(req.user._id, user, {
+      new: true,
+    });
+
+    res.send(updatedUser);
   }
-  const updatedUser = await User.findByIdAndUpdate(req.user._id, user, {
-    new: true,
-  });
-
-  if (!updatedUser)
-    return res.status(404).send("The account was not found in the db");
-
-  res.send(_.pick(updatedUser, "name", "email", "id", "isAdmin"));
-});
+);
 
 module.exports = router;
