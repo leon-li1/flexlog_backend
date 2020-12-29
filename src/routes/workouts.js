@@ -107,7 +107,7 @@ router.post("/add", [cookieParser, auth, validateUser], async (req, res) => {
   }).save();
 
   // update the user
-  updateUser(req.user._id, workout._id);
+  await updateUser(req.user._id, workout._id);
 
   workout = await Workout.findByIdAndUpdate(
     workout._id,
@@ -115,7 +115,8 @@ router.post("/add", [cookieParser, auth, validateUser], async (req, res) => {
     { new: true }
   );
 
-  res.send(workout);
+  // res.send(workout);
+  return getWorkouts(req, res);
 });
 
 router.post(
@@ -141,9 +142,10 @@ router.post(
     const newWorkout = await new Workout(workout).save();
 
     // update the user
-    updateUser(req.user._id, newWorkout._id);
+    await updateUser(req.user._id, newWorkout._id);
 
-    res.send(newWorkout);
+    // res.send(newWorkout);
+    return getWorkouts(req, res);
   }
 );
 
