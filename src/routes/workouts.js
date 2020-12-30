@@ -161,6 +161,8 @@ router.patch(
 
     if (req.body.numExercises === 0) return removeWorkout(req, res);
 
+    const workout = await Workout.findById(req.params.id);
+
     // remove unused exercises
     const unusedExercises = workout.exercises.filter((id) =>
       body.existingExercises.includes(id)
@@ -172,9 +174,9 @@ router.patch(
       $pull: { exercises: { $in: unusedExercises } },
     });
 
-    // create workout
+    // Update workout
     const exerciseIds = await createExercises(body, true);
-    const workout = await Workout.findByIdAndUpdate(
+    await Workout.findByIdAndUpdate(
       req.params.id,
       {
         name: body.name,
@@ -184,7 +186,7 @@ router.patch(
       { new: true }
     );
 
-    res.send(workout);
+    return getWorkouts(req, res);
   }
 );
 
