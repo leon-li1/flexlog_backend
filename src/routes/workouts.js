@@ -88,7 +88,9 @@ router.get(
   "/:id",
   [cookieParser, auth, validateUser, validateObjectId, validateWorkout],
   async (req, res) => {
-    const workout = await Workout.findById(req.params.id);
+    const workout = await Workout.findById(req.params.id).populate({
+      path: "exercises",
+    });
     res.send(workout);
   }
 );
