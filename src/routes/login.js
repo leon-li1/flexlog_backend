@@ -29,7 +29,11 @@ router.post("/", async (req, res) => {
     return res.status(400).send("Invalid email or password");
 
   const token = user.generateAuthToken();
-  res.cookie("token", token, { httpOnly: true });
+  res.cookie("token", token, {
+    httpOnly: true,
+    sameSite: "none",
+    secure: true,
+  });
   res.send({ token });
 });
 
