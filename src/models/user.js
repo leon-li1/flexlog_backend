@@ -48,7 +48,7 @@ const userSchema = new mongoose.Schema({
   units: {
     type: String,
     enum: ["Imperial", "Metric"],
-    default: "Metric",
+    default: "Imperial",
   },
   lastLogin: {
     type: Date,
